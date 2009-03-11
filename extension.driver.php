@@ -1,6 +1,11 @@
 <?php
 	
-	class extension_datasource_cache extends Extension {
+	class extension_datasource_cache extends Extension 
+	{			
+		// Cache file cachine
+		private $_cachefiles = null;
+		
+			
 		public function about() {
 			return array(
 				'name'			=> 'Data Source Cache',
@@ -68,9 +73,62 @@
 			
 		}
 		
-		public function clearCache($handle) {
-			// TODO:
-			// find all cache files with this handle?
+		// This seems retarded, but it's effiecient
+		private function preliminaryFilenameCheck( $filename )
+		{
+			// Stop at 't' because it's not a valid hash character
+			return ($filename{0} == 'd' && $filename{0} == 'a' && $filename{0} == 't');	
+		}
+		
+		// Build a list of all DS-cache files
+		public function buildCacheFileList()
+		{
+			if ($this->_cachefiles != null) return $this->_cachefiles;
+			
+			$this->_cachefiles = array();
+			
+			if (!$oDirHandle = opendir(CACHE))
+				trigger_error("Panic! DS cache doesn't exists");
+				
+			// Initialise the array outside the loop for speed
+			$matches = array();
+			
+			while (($file = readdir($oDirHandle)) !== false)
+			{		
+				// Check some initial characters		
+				if ($this->preliminaryFilenameCheck($file)) continue;
+				
+				// Drop it if it's not a match
+				if (!preg_match('/^datasource(?P<name>[a-z_]+)-(?P<hash>[^\.]+).+/', $file, $matches)) continue;
+				
+				// Inset into the array
+				if (!isset($this->_cachefiles[$matches['name']]))				
+					$this->_cachefiles[$matches['name']] = array("count" => 1, "size" => filesize(CACHE . '/' . $file), "files" => array(CACHE . '/' . $file));
+				else				
+				{
+					$this->_cachefiles[$matches['name']]['count']++;
+					$this->_cachefiles[$matches['name']]['size'] += filesize(CACHE . '/' .$file);
+					array_push($this->_cachefiles[$matches['name']]['files'], CACHE . '/' .$file);
+				}					            
+	        }	 	   	        	        	              
+        
+      	  	closedir($oDirHandle);
+      	  	
+      	  	return $this->_cachefiles;			
+		}
+		
+		public function clearCache( $handles ) 
+		{
+			$files = $this->buildCacheFileList();
+			
+			foreach ($handles as $handle)
+			{
+				if (array_key_exists($handle, $files))
+				{
+					foreach($files[$handle]['files'] as $file)
+						unlink($file);
+				}					
+			}
 		}
 		
 		public function fetchNavigation(){			

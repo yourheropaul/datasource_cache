@@ -1,6 +1,8 @@
 <?php
 
 	require_once(TOOLKIT . '/class.administrationpage.php');
+	require_once(TOOLKIT . '/class.datasourcemanager.php');
+	require_once(TOOLKIT . '/class.datasource.php');
 
 	Class contentExtensionDatasource_cacheView extends AdministrationPage{
 
@@ -25,7 +27,9 @@
 			);
 			
 			$dsm = new DatasourceManager($this->_Parent);
-			$datasources = $dsm->listAll();		
+			$datasources = $dsm->listAll();	
+			
+			$cachedata = $this->driver->buildCacheFileList();						
 			
 			$aTableBody = array();
 
@@ -46,9 +50,19 @@
 						$name = Widget::TableData($ds['name']);
 						$name->appendChild(Widget::Input("items[{$ds['handle']}]", null, 'checkbox'));
 
-						// TODO: show total cache XML files and their associated file size
-						$files = Widget::TableData('5');
-						$size = Widget::TableData('4kb');
+						$files = Widget::TableData(isset($cachedata[$ds['handle']]['count']) ? $cachedata[$ds['handle']]['count'] : '0');
+						
+						if (isset($cachedata[$ds['handle']]['size']))
+						{
+							if ($cachedata[$ds['handle']]['size'] < 1024)
+								$size_str = $cachedata[$ds['handle']]['size'] . "b";
+							else
+								$size_str = floor($cachedata[$ds['handle']]['size']/1024) . "kb";
+						}
+						else
+							$size_str = "0kb";
+						
+						$size = Widget::TableData($size_str);
 
 						$aTableBody[] = Widget::TableRow(array($name, $files, $size), ($bEven ? 'even' : NULL));
 
@@ -88,12 +102,8 @@
 				
 				switch($_POST['with-selected']) {
 
-					case 'clear':
-					
-						foreach ($checked as $ds) {
-							$this->driver->clearCache($ds);
-						}
-						die;
+					case 'clear':								
+						$this->driver->clearCache($checked);											
 						
 						redirect($this->_Parent->getCurrentPageURL());
 						break;
